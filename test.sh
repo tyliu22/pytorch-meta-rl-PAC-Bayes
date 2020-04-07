@@ -1,0 +1,2 @@
+# python test.py --config maml-halfcheetah-vel/config.json --policy maml-halfcheetah-vel/policy.th --output maml-halfcheetah-vel/results.npz --meta-batch-size 20 --num-batches 10  --num-workers 8
+python test.py --config jhgdfghsdfmaml-2d-navigation/config.json --policy maml-2d-navigation/policy.th --output maml-2d-navigation/results.npz --meta-batch-size 20 --num-batches 10  --num-workers 8
