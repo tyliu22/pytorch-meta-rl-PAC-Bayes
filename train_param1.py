@@ -144,7 +144,7 @@ def main(args, prior_policy=None, init_from_prior=True):
         #             num_iterations=num_iterations)
 
         # Save policy
-        # 构建文件
+        # 保存网络参数
         if args.output_folder is not None:
             with open(policy_filename, 'wb') as f:
                 # 保存网络中的参数，f 为路径
