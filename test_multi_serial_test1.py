@@ -23,31 +23,22 @@ def main(args):
     env.close()
 
     # Policy
-    policy = get_policy_for_env(env,
-                                hidden_sizes=config['hidden-sizes'],
-                                nonlinearity=config['nonlinearity'])
+    post_policy = get_policy_for_env(args.device,
+                                args.log_var_init,
+                                env,
+                                hidden_sizes=config['hidden-sizes'])
+
     with open(args.policy, 'rb') as f:
         state_dict = torch.load(f, map_location=torch.device(args.device))
-        # 加载模型
-        policy.load_state_dict(state_dict)
-    policy.share_memory()
+        post_policy.load_state_dict(state_dict)
+
 
     # Baseline
     baseline = LinearFeatureBaseline(get_input_size(env))
 
-    # Sampler
-    sampler = MultiTaskSampler(config['env-name'],
-                               env_kwargs=config['env-kwargs'],
-                               batch_size=config['fast-batch-size'],
-                               policy=policy,
-                               baseline=baseline,
-                               env=env,
-                               seed=args.seed,
-                               num_workers=args.num_workers)
+    tasks = env.unwrapped.sample_tasks(num_tasks)
 
-    logs = {'tasks': []}
-    train_returns, valid_returns = [], []
-    # test phase : update NN
+
     for batch in trange(args.num_batches):
         tasks = sampler.sample_tasks(num_tasks=args.meta_batch_size)
         train_episodes, valid_episodes = sampler.sample(tasks,
@@ -60,9 +51,6 @@ def main(args):
         logs['tasks'].extend(tasks)
         train_returns.append(get_returns(train_episodes[0]))
         valid_returns.append(get_returns(valid_episodes))
-        # definition of get_returns
-        # def get_returns(episodes):
-        #     return to_numpy([episode.rewards.sum(dim=0) for episode in episodes])
 
     logs['train_returns'] = np.concatenate(train_returns, axis=0)
     logs['valid_returns'] = np.concatenate(valid_returns, axis=0)

@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.multiprocessing as mp
 import asyncio
@@ -7,10 +9,14 @@ import time
 from datetime import datetime, timezone
 from copy import deepcopy
 
+from torch import nn, optim
+from torch.distributions import Independent, Normal
+
+from Utils.common import grad_step
 from maml_rl.samplers.sampler import Sampler, make_env
 from maml_rl.envs.utils.sync_vector_env import SyncVectorEnv
 from maml_rl.episode import BatchEpisodes
-from maml_rl.utils.reinforcement_learning import reinforce_loss
+from maml_rl.utils.reinforcement_learning_StochNN import reinforce_loss
 
 
 def _create_consumer(queue, futures, loop=None):
@@ -90,6 +96,8 @@ class MultiTaskSampler(Sampler):
         self.train_episodes_queue = mp.Queue()
         self.valid_episodes_queue = mp.Queue()
         policy_lock = mp.Lock()
+        # self.Original_policy = self.policy
+        # temporary_policy = self.Original_policy
 
         # 构建 num_workers 个 workers；调用 num_workers 次
         self.workers = [SamplerWorker(index,
@@ -240,6 +248,9 @@ class MultiTaskSampler(Sampler):
 
 
 class SamplerWorker(mp.Process):
+    # 每一个 worker 都对应于单独的一个SamplerWorker(）
+    # 此处的 policy 都来自于里 worker 的 deepcopy(policy)
+    #  因此不会对最上面的 policy 作出改变
     def __init__(self,
                  index,
                  env_name,
@@ -297,14 +308,16 @@ class SamplerWorker(mp.Process):
         MAML 内部循环更新num_steps次 inner loop / fast adaptation
         """
         # 此处参数设置为 None，调用 OrderDict() 参数
-        params = None
+        """
+        ******************************************************************
+        """
+        # params = None
 
-        params_show_multi_task_sampler = self.policy.state_dict()
+        # params_show_multi_task_sampler = self.policy.state_dict()
 
         for step in range(num_steps):
             # 获取该batch中所有的轨迹数据，将数据保存至 train_episodes
-            train_episodes = self.create_episodes(params=params,
-                                                  gamma=gamma,
+            train_episodes = self.create_episodes(gamma=gamma,
                                                   gae_lambda=gae_lambda,
                                                   device=device)
             train_episodes.log('_enqueueAt', datetime.now(timezone.utc))
@@ -321,17 +334,27 @@ class SamplerWorker(mp.Process):
             # with + lock：保证每次只有一个线程执行下面代码块
             # with 语句会在这个代码块执行前自动获取锁，在执行结束后自动释放锁
             with self.policy_lock:
-                loss = reinforce_loss(self.policy, train_episodes, params=params)
-                params = self.policy.update_params(loss,
-                                                   params=params,
-                                                   step_size=fast_lr,
-                                                   first_order=True)
-
-                params_show_multi_task_sampler_test = self.policy.state_dict()
+                """
+                ******************************************************************
+                """
+                loss = reinforce_loss(self.policy, train_episodes)
+                lr = 1e-3
+                self.policy.train()
+                optimizer = optim.Adam(self.policy.parameters(), lr)
+                # Take gradient step:
+                # 计算梯度 已经
+                grad_step(loss, optimizer)
+                # params = self.policy.update_params(loss,
+                #                                    params=params,
+                #                                    step_size=fast_lr,
+                #                                    first_order=True)
+                """
+                ******************************************************************
+                """
+                # params_show_multi_task_sampler_test = self.policy.state_dict()
 
         # Sample the validation trajectories with the adapted policy
-        valid_episodes = self.create_episodes(params=params,
-                                              gamma=gamma,
+        valid_episodes = self.create_episodes(gamma=gamma,
                                               gae_lambda=gae_lambda,
                                               device=device)
         valid_episodes.log('_enqueueAt', datetime.now(timezone.utc))
@@ -340,7 +363,6 @@ class SamplerWorker(mp.Process):
     # 构建 episodes 变量，用于保存完整轨迹的数据
     # episodes = (observation, action, reward, batch_ids, advantage)
     def create_episodes(self,
-                        params=None,
                         gamma=0.95,
                         gae_lambda=1.0,
                         device='cpu'):
@@ -354,7 +376,10 @@ class SamplerWorker(mp.Process):
 
         #
         t0 = time.time()
-        for item in self.sample_trajectories(params=params):
+        """
+        ******************************************************************
+        """
+        for item in self.sample_trajectories():
             episodes.append(*item)
         episodes.log('duration', time.time() - t0)
 
@@ -364,15 +389,35 @@ class SamplerWorker(mp.Process):
                                     normalize=True)
         return episodes
 
-    def sample_trajectories(self, params=None):
+    def sample_trajectories(self,
+                            init_std=1.0,
+                            min_std=1e-6,
+                            output_size=2):
         # 基于当前策略，采样 batch_size 个完整的轨迹
         observations = self.envs.reset()
         with torch.no_grad():
             while not self.envs.dones.all():
                 observations_tensor = torch.from_numpy(observations)
-                pi = self.policy(observations_tensor, params=params)
-                actions_tensor = pi.sample()
+                """
+                ******************************************************************
+                """
+                output = self.policy(observations_tensor)
+
+                min_log_std = math.log(min_std)
+                sigma = nn.Parameter(torch.Tensor(output_size))
+                sigma.data.fill_(math.log(init_std))
+
+                scale = torch.exp(torch.clamp(sigma, min=min_log_std))
+                # loc 是高斯分布均值
+                # scale 是高斯分布方差
+                p_normal = Independent(Normal(loc=output, scale=scale), 1)
+
+                actions_tensor = p_normal.sample()
                 actions = actions_tensor.cpu().numpy()
+
+                # pi = policy(observations_tensor)
+                # actions_tensor = pi.sample()
+                # actions = actions_tensor.cpu().numpy()
 
                 new_observations, rewards, _, infos = self.envs.step(actions)
                 batch_ids = infos['batch_ids']
@@ -390,8 +435,11 @@ class SamplerWorker(mp.Process):
                 break
 
             # index task['goal']  kwargs:params
+            """
+            num_workers : index
+            
+            """
             index, task, kwargs = data
-            # 根据任务，重新初始化环境，之后进行采样
             self.envs.reset_task(task)
             """
             sample

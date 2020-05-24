@@ -5,7 +5,7 @@ from torch.nn.utils.convert_parameters import parameters_to_vector
 from torch.distributions.kl import kl_divergence
 
 from Utils.common import grad_step
-from maml_rl.samplers.multi_task_sampler_param1 import MultiTaskSampler
+from maml_rl.samplers.multi_task_sampler_multi_test1 import MultiTaskSampler
 from maml_rl.metalearners.base import GradientBasedMetaLearner
 from maml_rl.utils.torch_utils import (weighted_mean, detach_distribution,
                                        to_numpy, vector_to_parameters)
@@ -49,6 +49,7 @@ class MAMLTRPO(GradientBasedMetaLearner):
            (2015). Trust Region Policy Optimization. International Conference on
            Machine Learning (ICML) (https://arxiv.org/abs/1502.05477)
     """
+
     # 此处的策略是最原始的策略，采样之前的策略
     def __init__(self,
                  original_policy,
@@ -73,10 +74,10 @@ class MAMLTRPO(GradientBasedMetaLearner):
 
         for train_future in train_futures:
             """
-            
+
             """
             train_loss = reinforce_loss(self.original_policy,
-                                  await train_future)
+                                        await train_future)
             lr = 1e-3
             self.original_policy.train()
             optimizer = optim.Adam(self.original_policy.parameters(), lr)
@@ -115,8 +116,9 @@ class MAMLTRPO(GradientBasedMetaLearner):
 
             return flat_grad2_kl + damping * vector
         return _product
-        
+
     """
+
     # 协程函数
     # 根据 step() 函数单独计算 task 的 (train, valid) 对应的
     async def surrogate_loss(self,
@@ -127,7 +129,7 @@ class MAMLTRPO(GradientBasedMetaLearner):
         # 暂停协程函数，等待协程函数 adapt() 运行结束并更新 self.original_policy
         # 要先在此处暂停函数
         train_loss = await self.adapt(train_futures,
-                         first_order=first_order)
+                                      first_order=first_order)
 
         # valid_loss = reinforce_loss(self.original_policy,
         #                           await futures)
@@ -243,7 +245,7 @@ class MAMLTRPO(GradientBasedMetaLearner):
 
         # 查看最终神经网络参数
         params_final = self.policy.parameters()
-        
+
         """
         # logs['loss_before', 'kl_before', 'loss_after', 'kl_after']
         return logs

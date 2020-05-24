@@ -15,6 +15,7 @@ class StochasticLayer(nn.Module):
     # self.init  and self.operation should be filled by derived classes
 
     """
+    随机层参数 均值 w 与权重 b : [ mean & log_var ]
     记录参数总个数weights_count「权重w 偏置b」
     权重w：mean: w_mu & log_var: w_log_var
     偏置b：mean: b_mu & log_var: b_log_var
@@ -94,6 +95,7 @@ class StochasticLayer(nn.Module):
 class StochasticLinear(StochasticLayer):
 
     def __init__(self, in_dim, out_dim, log_var_init, use_bias=True):
+        # 输入维度，输出维度，
         super(StochasticLinear, self).__init__()
 
         self.in_dim = in_dim

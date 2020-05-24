@@ -1,7 +1,7 @@
 import torch
 import asyncio
 
-from maml_rl.samplers.multi_task_sampler_param1 import MultiTaskSampler
+from maml_rl.samplers.multi_task_sampler import MultiTaskSampler
 
 
 class GradientBasedMetaLearner(object):

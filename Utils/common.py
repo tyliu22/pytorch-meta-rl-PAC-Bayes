@@ -9,7 +9,6 @@ import numpy as np
 import random
 import sys
 import pickle
-from Utils.data_gen import get_info
 from functools import reduce
 
 # -----------------------------------------------------------------------------------------------------------#
@@ -136,10 +135,10 @@ def load_model_state(model, f_path):
 #     return total_norm
 
 
-def net_weights_magnitude(model, prm, p=2):  # corrected
+def net_weights_magnitude(model, device, p=2):  # corrected
     ''' Calculates the total p-norm of the weights  |W|_p^p
         If exp_on_logs flag is on, then parameters with log_var in their name are exponented'''
-    total_mag = torch.zeros(1, device=prm.device, requires_grad=True)[0]
+    total_mag = torch.zeros(1, device=device, requires_grad=True)[0]
     for (param_name, param) in model.named_parameters():
         total_mag = total_mag + param.pow(p).sum()
     return total_mag
@@ -154,7 +153,7 @@ def grad_step(objective, optimizer, lr_schedule=None, initial_lr=None, i_epoch=N
     if lr_schedule:
         adjust_learning_rate_schedule(optimizer, i_epoch, initial_lr, **lr_schedule)
     optimizer.zero_grad()
-    objective.backward()
+    objective.backward(retain_graph=True)
     # torch.nn.utils.clip_grad_norm(parameters, 0.25)
     optimizer.step()
 
