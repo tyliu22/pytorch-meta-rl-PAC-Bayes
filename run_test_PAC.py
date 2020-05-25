@@ -10,11 +10,11 @@ run_test function:
 ************************************************************************************************************************
 """
 
-from maml_rl.samplers.multi_task_sampler_multi_serial_test1 import SampleTest
-from Utils.complexity_terms import get_task_complexity, get_meta_complexity_term, get_hyper_divergnce
-from Utils.common import grad_step
 import matplotlib.pyplot as plt
 
+from Utils.common import grad_step
+from Utils.complexity_terms import get_task_complexity, get_meta_complexity_term, get_hyper_divergnce
+from maml_rl.samplers.multi_task_sampler_multi_serial_test1 import SampleTest
 
 """
 ************************************************************************************************************************

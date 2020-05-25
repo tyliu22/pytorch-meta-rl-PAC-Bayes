@@ -3,13 +3,13 @@
 
 from __future__ import absolute_import, division, print_function
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Utils import data_gen
-from Utils.common import list_mult
-from Models.stochastic_layers import StochasticLinear, StochasticLayer
+
 from Models.layer_inits import init_layers
+from Models.stochastic_layers import StochasticLinear, StochasticLayer
+# from Utils import data_gen
+from Utils.common import list_mult
 
 
 # -------------------------------------------------------------------------------------------

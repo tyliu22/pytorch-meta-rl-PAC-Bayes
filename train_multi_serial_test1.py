@@ -15,27 +15,22 @@
 ************************************************************************************************************************
 # """
 
+import os
 from copy import deepcopy
+from functools import reduce
+from operator import mul
 
 import gym
 import torch
-import json
-import os
-import yaml
-from tqdm import trange
-from functools import reduce
-from operator import mul
 import torch.optim as optim
+import yaml
 
-import maml_rl.envs
-from maml_rl.utils.torch_utils import to_numpy
+from Utils.common import grad_step
+from Utils.complexity_terms import get_task_complexity, get_meta_complexity_term, get_hyper_divergnce
 from maml_rl.baseline import LinearFeatureBaseline
 from maml_rl.samplers.multi_task_sampler_multi_serial_test1 import SampleTest
 from maml_rl.utils.helpers_bayes import get_policy_for_env, get_input_size
-from Utils.complexity_terms import get_task_complexity, get_meta_complexity_term, get_hyper_divergnce
-from Utils.common import grad_step
-from Utils.PlotTrajectories import plotTrajectories
-import run_test
+from run_test_PAC import run_test
 
 
 def main(args, prior_policy=None, init_from_prior=True):
@@ -159,7 +154,7 @@ def main(args, prior_policy=None, init_from_prior=True):
 
     # 训练的次数 num-batches 个 batch
     for batch in range(config['num-batches']):
-        # print(batch)
+        print(batch)
 
         # params_show_train = prior_policy.state_dict()
 
